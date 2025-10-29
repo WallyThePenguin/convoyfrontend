@@ -1,5 +1,22 @@
 import './App.css'
 
+const withBase = (path) => new URL(path, import.meta.env.BASE_URL).href
+
+const heroGalleryImages = [
+  {
+    path: 'images/convoy-hero-01.png',
+    alt: 'Night convoy overlooking the city skyline',
+  },
+  {
+    path: 'images/convoy-hero-02.png',
+    alt: 'Drivers lining up at a car meet',
+  },
+  {
+    path: 'images/convoy-hero-03.png',
+    alt: 'Convoy cars cruising through neon-lit streets',
+  },
+]
+
 const metrics = [
   { label: 'Target private beta convoys per day', value: '5+' },
   { label: 'Latency budget for live updates', value: '< 1s' },
@@ -147,8 +164,14 @@ const usageTips = [
 ]
 
 function App() {
+  const heroGallerySources = heroGalleryImages.map((item) => ({
+    ...item,
+    src: withBase(item.path),
+  }))
+  const heroBackgroundImage = heroGallerySources[0].src
+
   return (
-    <div className="page">
+    <div className="page" style={{ '--hero-bg-image': `url(${heroBackgroundImage})` }}>
       <header className="hero">
         <div className="hero__badge">Convoy Preview</div>
         <h1 className="hero__title">Drive. Connect. Belong.</h1>
@@ -174,9 +197,9 @@ function App() {
           ))}
         </div>
         <div className="hero__gallery">
-          <img src="/images/convoy-hero-01.png" alt="Night convoy overlooking the city skyline" />
-          <img src="/images/convoy-hero-02.png" alt="Drivers lining up at a car meet" />
-          <img src="/images/convoy-hero-03.png" alt="Convoy cars cruising through neon-lit streets" />
+          {heroGallerySources.map(({ path, src, alt }) => (
+            <img key={path} src={src} alt={alt} />
+          ))}
         </div>
       </header>
 

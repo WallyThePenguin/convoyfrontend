@@ -12,8 +12,12 @@
 .page {
   color: var(--text-primary);
   min-height: 100vh;
-  background: linear-gradient(180deg, rgba(15, 12, 26, 0.95) 0%, rgba(5, 5, 12, 0.95) 100%),
-    url('/images/convoy-hero-01.png') no-repeat center/cover;
+  background:
+    linear-gradient(180deg, rgba(15, 12, 26, 0.95) 0%, rgba(5, 5, 12, 0.95) 100%),
+    var(--hero-bg-image, url('/images/convoy-hero-01.png'));
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
   backdrop-filter: blur(10px);
 }
 
