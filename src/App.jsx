@@ -1,4 +1,8 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'
 
 const withBase = (path) => {
   const base = import.meta.env.BASE_URL || '/'
@@ -22,7 +26,7 @@ const heroGalleryImages = [
   },
 ]
 
-const metrics = [
+const baseMetrics = [
   { label: 'Target private beta convoys per day', value: '5+' },
   { label: 'Latency budget for live updates', value: '< 1s' },
   { label: 'Elite tier conversion goal', value: '3%' },
@@ -169,11 +173,176 @@ const usageTips = [
 ]
 
 function App() {
+  const [newsletterForm, setNewsletterForm] = useState({
+    name: '',
+    email: '',
+    source: 'website',
+  })
+  const [newsletterStatus, setNewsletterStatus] = useState('idle')
+  const [newsletterMessage, setNewsletterMessage] = useState('')
+  const [applicationForm, setApplicationForm] = useState({
+    name: '',
+    email: '',
+    roleInterest: '',
+    experience: '',
+    portfolioUrl: '',
+    message: '',
+  })
+  const [applicationStatus, setApplicationStatus] = useState('idle')
+  const [applicationMessage, setApplicationMessage] = useState('')
+  const [stats, setStats] = useState(null)
+  const [statsStatus, setStatsStatus] = useState('idle')
+
+  const numberFormatter = useMemo(
+    () => new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }),
+    [],
+  )
+
+  const loadSummary = useCallback(async () => {
+    try {
+      setStatsStatus((previous) =>
+        previous === 'success' ? 'refreshing' : 'loading',
+      )
+      const response = await fetch(`${API_BASE_URL}/api/stats/summary`)
+      if (!response.ok) {
+        throw new Error('Failed to load summary metrics.')
+      }
+      const payload = await response.json()
+      setStats(payload.data ?? null)
+      setStatsStatus('success')
+    } catch (error) {
+      console.error('Failed to load stats summary', error)
+      setStatsStatus('error')
+    }
+  }, [])
+
+  useEffect(() => {
+    loadSummary()
+  }, [loadSummary])
+
+  const metrics = useMemo(() => {
+    const dynamic = []
+    if (stats?.newsletter?.total != null) {
+      dynamic.push({
+        label: 'Convoy insiders on the mailing list',
+        value: numberFormatter.format(stats.newsletter.total),
+      })
+    }
+    if (stats?.applications?.total != null) {
+      dynamic.push({
+        label: 'Team applications received',
+        value: numberFormatter.format(stats.applications.total),
+      })
+    }
+    return [...dynamic, ...baseMetrics]
+  }, [stats, numberFormatter])
+
+  const newsletterBlurb =
+    stats?.newsletter?.total != null
+      ? `${numberFormatter.format(
+          stats.newsletter.total,
+        )} drivers already get the early release notes.`
+      : 'Get early access drops and roadmap notes. No spam.'
+
+  const applicationBlurb =
+    stats?.applications?.total != null
+      ? `We have heard from ${numberFormatter.format(
+          stats.applications.total,
+        )} builders so far.`
+      : 'We review every application weekly.'
+
   const heroGallerySources = heroGalleryImages.map((item) => ({
     ...item,
     src: withBase(item.path),
   }))
   const heroBackgroundImage = heroGallerySources[0].src
+
+  const handleNewsletterChange = (event) => {
+    const { name, value } = event.target
+    setNewsletterForm((previous) => ({ ...previous, [name]: value }))
+  }
+
+  const handleNewsletterSubmit = async (event) => {
+    event.preventDefault()
+    setNewsletterStatus('loading')
+    setNewsletterMessage('')
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/newsletter`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: newsletterForm.email,
+          name: newsletterForm.name || undefined,
+          source: newsletterForm.source,
+        }),
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(payload?.error?.message || 'Unable to join the list.')
+      }
+      setNewsletterStatus('success')
+      setNewsletterMessage(payload?.data?.message ?? 'Welcome to the crew.')
+      setNewsletterForm({ name: '', email: '', source: 'website' })
+      loadSummary()
+    } catch (error) {
+      console.error('Newsletter signup failed', error)
+      setNewsletterStatus('error')
+      setNewsletterMessage(error.message || 'Something went wrong.')
+    }
+  }
+
+  const handleApplicationChange = (event) => {
+    const { name, value } = event.target
+    setApplicationForm((previous) => ({ ...previous, [name]: value }))
+  }
+
+  const handleApplicationSubmit = async (event) => {
+    event.preventDefault()
+    setApplicationStatus('loading')
+    setApplicationMessage('')
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/applications`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: applicationForm.name,
+          email: applicationForm.email,
+          roleInterest: applicationForm.roleInterest,
+          experience: applicationForm.experience || undefined,
+          portfolioUrl: applicationForm.portfolioUrl || undefined,
+          message: applicationForm.message,
+        }),
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(
+          payload?.error?.message || 'Unable to submit right now.',
+        )
+      }
+      setApplicationStatus('success')
+      setApplicationMessage(
+        payload?.data?.message ??
+          'Application received. Thanks for reaching out.',
+      )
+      setApplicationForm({
+        name: '',
+        email: '',
+        roleInterest: '',
+        experience: '',
+        portfolioUrl: '',
+        message: '',
+      })
+      loadSummary()
+    } catch (error) {
+      console.error('Application submission failed', error)
+      setApplicationStatus('error')
+      setApplicationMessage(error.message || 'Something went wrong.')
+    }
+  }
 
   return (
     <div className="page" style={{ '--hero-bg-image': `url(${heroBackgroundImage})` }}>
@@ -189,11 +358,26 @@ function App() {
           <a className="button button--primary" href="#experience">
             Explore the experience
           </a>
+          <a className="button button--ghost" href="#team">
+            Apply to the team
+          </a>
           <a className="button button--ghost" href="#palette">
             View design palette
           </a>
         </div>
         <div className="metrics">
+          {(statsStatus === 'loading' || statsStatus === 'refreshing') && (
+            <div className="metric metric--status">
+              <span className="metric__value">...</span>
+              <span className="metric__label">Loading live stats</span>
+            </div>
+          )}
+          {statsStatus === 'error' && (
+            <div className="metric metric--status metric--error">
+              <span className="metric__value">--</span>
+              <span className="metric__label">Live stats unavailable</span>
+            </div>
+          )}
           {metrics.map((metric) => (
             <div key={metric.label} className="metric">
               <span className="metric__value">{metric.value}</span>
@@ -206,6 +390,57 @@ function App() {
             <img key={path} src={src} alt={alt} />
           ))}
         </div>
+        <form className="inline-form" onSubmit={handleNewsletterSubmit}>
+          <div className="inline-form__row">
+            <label className="sr-only" htmlFor="newsletter-name">
+              Name
+            </label>
+            <input
+              id="newsletter-name"
+              name="name"
+              type="text"
+              placeholder="Name (optional)"
+              value={newsletterForm.name}
+              onChange={handleNewsletterChange}
+              disabled={newsletterStatus === 'loading'}
+            />
+            <label className="sr-only" htmlFor="newsletter-email">
+              Email
+            </label>
+            <input
+              id="newsletter-email"
+              name="email"
+              type="email"
+              required
+              placeholder="Email address"
+              value={newsletterForm.email}
+              onChange={handleNewsletterChange}
+              disabled={newsletterStatus === 'loading'}
+            />
+            <button
+              type="submit"
+              className="button button--primary"
+              disabled={
+                newsletterStatus === 'loading' || !newsletterForm.email
+              }
+            >
+              {newsletterStatus === 'loading'
+                ? 'Joining...'
+                : 'Join the list'}
+            </button>
+          </div>
+          <p className="inline-form__note">{newsletterBlurb}</p>
+          {newsletterStatus === 'success' && (
+            <p className="form-feedback form-feedback--success" role="status">
+              {newsletterMessage}
+            </p>
+          )}
+          {newsletterStatus === 'error' && (
+            <p className="form-feedback form-feedback--error" role="alert">
+              {newsletterMessage}
+            </p>
+          )}
+        </form>
       </header>
 
       <main>
@@ -279,6 +514,137 @@ function App() {
           </div>
         </section>
 
+        <section id="team" className="section team-section">
+          <div className="section__grid">
+            <div>
+              <h2 className="section__title">Join the build crew</h2>
+              <p>
+                We are assembling a tight crew of builders to ship the next
+                Convoy milestone together. Tell us what you want to own and
+                bring your best routes, telemetry tricks, or community ideas.
+              </p>
+              <p className="team-section__note">{applicationBlurb}</p>
+              <ul className="plain-list plain-list--bullet">
+                <li>Shape the real-time convoy stack and design systems.</li>
+                <li>Host early rides, gather feedback, and build community.</li>
+                <li>Ship alongside a small, focused squad of enthusiasts.</li>
+              </ul>
+            </div>
+            <form className="application-form" onSubmit={handleApplicationSubmit}>
+              <div className="application-form__grid">
+                <div className="form-field">
+                  <label htmlFor="application-name">Full name</label>
+                  <input
+                    id="application-name"
+                    name="name"
+                    type="text"
+                    placeholder="Jordan Rivera"
+                    value={applicationForm.name}
+                    onChange={handleApplicationChange}
+                    required
+                    disabled={applicationStatus === 'loading'}
+                  />
+                </div>
+                <div className="form-field">
+                  <label htmlFor="application-email">Email</label>
+                  <input
+                    id="application-email"
+                    name="email"
+                    type="email"
+                    placeholder="you@convoy.app"
+                    value={applicationForm.email}
+                    onChange={handleApplicationChange}
+                    required
+                    disabled={applicationStatus === 'loading'}
+                  />
+                </div>
+                <div className="form-field">
+                  <label htmlFor="application-role">What do you want to lead?</label>
+                  <input
+                    id="application-role"
+                    name="roleInterest"
+                    type="text"
+                    placeholder="Example: Mobile, Backend, Community Ops"
+                    value={applicationForm.roleInterest}
+                    onChange={handleApplicationChange}
+                    required
+                    disabled={applicationStatus === 'loading'}
+                  />
+                </div>
+                <div className="form-field">
+                  <label htmlFor="application-portfolio">
+                    Portfolio or relevant links <span>(optional)</span>
+                  </label>
+                  <input
+                    id="application-portfolio"
+                    name="portfolioUrl"
+                    type="url"
+                    placeholder="https://"
+                    value={applicationForm.portfolioUrl}
+                    onChange={handleApplicationChange}
+                    disabled={applicationStatus === 'loading'}
+                  />
+                </div>
+                <div className="form-field form-field--full">
+                  <label htmlFor="application-experience">
+                    Relevant experience <span>(optional)</span>
+                  </label>
+                  <textarea
+                    id="application-experience"
+                    name="experience"
+                    rows="3"
+                    placeholder="Crew leader, telemetry engineer, or live ops wizard? Let us know."
+                    value={applicationForm.experience}
+                    onChange={handleApplicationChange}
+                    disabled={applicationStatus === 'loading'}
+                  />
+                </div>
+                <div className="form-field form-field--full">
+                  <label htmlFor="application-message">Why Convoy?</label>
+                  <textarea
+                    id="application-message"
+                    name="message"
+                    rows="4"
+                    placeholder="Share how you want to push Convoy forward."
+                    value={applicationForm.message}
+                    onChange={handleApplicationChange}
+                    required
+                    disabled={applicationStatus === 'loading'}
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                className="button button--primary application-form__submit"
+                disabled={
+                  applicationStatus === 'loading' ||
+                  !applicationForm.name ||
+                  !applicationForm.email ||
+                  !applicationForm.roleInterest ||
+                  !applicationForm.message
+                }
+              >
+                {applicationStatus === 'loading'
+                  ? 'Sending...'
+                  : 'Submit application'}
+              </button>
+              <p className="application-form__caption">
+                Expect a personal reply within a week. We respect your inbox.
+              </p>
+              {applicationStatus === 'success' && (
+                <p className="form-feedback form-feedback--success" role="status">
+                  {applicationMessage}
+                </p>
+              )}
+              {applicationStatus === 'error' && (
+                <p className="form-feedback form-feedback--error" role="alert">
+                  {applicationMessage}
+                </p>
+              )}
+            </form>
+          </div>
+        </section>
+
         <section id="roadmap" className="section">
           <h2 className="section__title">Product roadmap</h2>
           <div className="roadmap">
@@ -342,8 +708,8 @@ function App() {
           across backend, frontend, and mobile. Tap in if you want to shape the
           next milestone.
         </p>
-        <a className="button button--primary" href="mailto:team@convoy.app">
-          Join the build crew
+        <a className="button button--primary" href="#team">
+          Submit your application
         </a>
       </footer>
     </div>
