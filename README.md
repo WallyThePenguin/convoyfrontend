@@ -1,16 +1,42 @@
-# React + Vite
+# Convoy Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Marketing + signup experience for Convoy built with React and Vite. The UI integrates with the Convoy backend to capture newsletter subscriptions, accept team applications, and surface live stats in the hero section.
 
-Currently, two official plugins are available:
+## Prerequisites
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Node.js 18+
+- Convoy backend running locally or deployed (see `../backend/README.md`)
 
-## React Compiler
+## Environment Variables
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Create `.env.local` for development (or `.env.production` for deploys) and set:
 
-## Expanding the ESLint configuration
+```
+VITE_API_BASE_URL=http://localhost:4000
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Point this to the backend origin you want the frontend to query (e.g., `https://api.convoy.app`). Do not include a trailing slash.
+
+## Install & Run
+
+```bash
+npm install
+npm run dev         # start Vite with HMR
+npm run build       # create production bundle in dist/
+npm run preview     # serve the production build locally
+```
+
+## Feature Highlights
+
+- Hero metrics fetch live counts from `GET /api/stats/summary`.
+- Newsletter form posts to `POST /api/newsletter` with loading/error feedback.
+- Team application form posts to `POST /api/applications` and refreshes stats.
+- Responsive layout tuned for desktop and mobile breakpoints.
+
+## Deploy
+
+1. Configure `VITE_API_BASE_URL` in your hosting provider.
+2. Run `npm run build`.
+3. Upload the `dist/` folder or let the host run the build step automatically.
+
+Redeploy the frontend whenever the backend URL or environment variables change.
